@@ -17,7 +17,7 @@ type TrackingResult = {
 type QueueState = "queued" | "checking" | "complete" | "failed";
 type BatchItem = { trackingNumber: string; state: QueueState; tracking?: TrackingResult };
 
-const EXAMPLE_CODES = "00340434292135100162\n00340434292135100186\n7777777770";
+const DEMO_CODES = Array.from({ length: 50 }, (_, index) => `PPDHLDEMO${String(index + 1).padStart(3, "0")}`).join("\n");
 const RATE_LIMIT_MS = 5_100;
 
 function parseTrackingNumbers(value: string) {
@@ -29,7 +29,7 @@ function queueStateLabel(state: QueueState) {
 }
 
 export default function Home() {
-  const [batchText, setBatchText] = useState(EXAMPLE_CODES);
+  const [batchText, setBatchText] = useState(DEMO_CODES);
   const [items, setItems] = useState<BatchItem[]>([]);
   const [selected, setSelected] = useState<TrackingResult | null>(null);
   const [isRunning, setIsRunning] = useState(false);
@@ -42,6 +42,13 @@ export default function Home() {
 
   function updateItem(index: number, update: Partial<BatchItem>) {
     setItems((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, ...update } : item));
+  }
+
+  function loadDemoCodes() {
+    setBatchText(DEMO_CODES);
+    setItems([]);
+    setSelected(null);
+    setNotice("50 unique DHL demo codes loaded. They return DHL's mocked demo response.");
   }
 
   async function runBatch(event: FormEvent<HTMLFormElement>) {
@@ -93,7 +100,7 @@ export default function Home() {
           <p className="hero-description">Paste a list, run one batch, and let the dashboard deliver every shipment status without manual lookups.</p>
         </div>
         <form className="batch-form" onSubmit={runBatch}>
-          <div className="form-head"><label htmlFor="tracking-numbers">Tracking numbers</label><span>{parsedCount} / 100 unique codes</span></div>
+          <div className="form-head"><label htmlFor="tracking-numbers">Tracking numbers</label><div><button className="demo-fill" type="button" onClick={loadDemoCodes} disabled={isRunning}>Load 50 demo codes</button><span>{parsedCount} / 100 unique codes</span></div></div>
           <textarea id="tracking-numbers" value={batchText} onChange={(event) => setBatchText(event.target.value)} placeholder="Paste one code per line, or separate codes with commas" disabled={isRunning} />
           <div className="form-actions"><p className="connection-note" role="status"><span>●</span>{notice}</p><button type="submit" disabled={isRunning}>{isRunning ? "Batch running…" : "Run batch"}<span aria-hidden="true">→</span></button></div>
         </form>
