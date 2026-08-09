@@ -28,6 +28,14 @@ function queueStateLabel(state: QueueState) {
   return { queued: "Waiting", checking: "Checking", complete: "Complete", failed: "Unavailable" }[state];
 }
 
+function formatEta(value?: string) {
+  if (!value || value === "Not available") return "Not supplied";
+  const date = new Date(value);
+  return Number.isNaN(date.valueOf())
+    ? value
+    : new Intl.DateTimeFormat("en", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }).format(date);
+}
+
 export default function Home() {
   const [batchText, setBatchText] = useState(DEMO_CODES);
   const [items, setItems] = useState<BatchItem[]>([]);
@@ -117,11 +125,11 @@ export default function Home() {
         <article className="batch-card">
           <div className="batch-card-head"><div><p className="section-label">BATCH RESULTS</p><h2>Shipment statuses</h2></div><span>{items.length ? `${completeCount} / ${items.length}` : "No batch yet"}</span></div>
           {items.length ? <div className="results-table" role="table" aria-label="Batch tracking results">
-            <div className="result-row result-header" role="row"><span>Tracking number</span><span>Status</span><span>Service</span><span>Source</span></div>
+            <div className="result-row result-header" role="row"><span>Tracking number</span><span>Status</span><span>Estimated arrival</span><span>Source</span></div>
             {items.map((item) => <button className={`result-row state-${item.state}`} key={item.trackingNumber} type="button" onClick={() => item.tracking && setSelected(item.tracking)} disabled={!item.tracking}>
               <span className="code-cell">{item.trackingNumber}</span>
               <span><i className="result-dot" />{item.tracking ? item.tracking.status : queueStateLabel(item.state)}</span>
-              <span>{item.tracking?.service ?? "—"}</span>
+              <span className="eta-cell">{item.tracking ? formatEta(item.tracking.estimatedDelivery) : "—"}</span>
               <span className="source-cell">{item.tracking?.source ?? "Queued"}</span>
             </button>)}
           </div> : <div className="empty-state"><span className="empty-count">100</span><h3>Ready for your shipment list</h3><p>Paste up to 100 DHL tracking numbers above. Each line becomes a result row here.</p></div>}
@@ -136,6 +144,12 @@ export default function Home() {
             <ol className="mini-timeline">{selected.events.slice(0, 3).map((shipmentEvent, index) => <li key={`${shipmentEvent.date}-${index}`} className={shipmentEvent.current ? "is-current" : ""}><i /><div><strong>{shipmentEvent.description}</strong><span>{shipmentEvent.date} · {shipmentEvent.time} · {shipmentEvent.location}</span></div></li>)}</ol>
           </> : <div className="awaiting-detail"><span className="pulse-dot" /><p>Select a completed row to see its most recent DHL event and delivery details.</p></div>}
         </aside>
+      </section>
+
+      <section className="status-guide" aria-labelledby="status-guide-title">
+        <div className="guide-intro"><p className="section-label">DHL TRACKING REFERENCE</p><h2 id="status-guide-title">What the API can tell you</h2><p>Exact codes and event names vary by DHL service. The app preserves the original DHL status and description when a real API key is connected.</p></div>
+        <div className="guide-panel"><h3>Common delivery states</h3><div className="status-groups"><span>Label created</span><span>Picked up</span><span>In transit</span><span>At customs</span><span>On hold</span><span>Out for delivery</span><span>Available for pickup</span><span>Delivered</span><span>Delivery exception</span><span>Refused / returned</span><span>Cancelled</span></div><p>Examples include “Shipment label created”, “In transit”, “On hold”, and “Out for delivery”.</p></div>
+        <div className="guide-panel"><h3>Available shipment information</h3><ul className="api-data-list"><li>Current location and route history</li><li>ETA and delivery time window, when supplied</li><li>Status, detailed event description and timestamp</li><li>Origin, destination, provider and tracking ID</li><li>Piece events, weight and dimensions, when available</li><li>Proof of delivery for eligible Express and Freight shipments</li></ul></div>
       </section>
 
       <section className="integration-strip"><p><span className="pulse-dot" /> RATE-SAFE BATCHING</p><span>One paste, one batch, up to 100 codes</span><span className="strip-divider" /><span>DHL’s entry key is paced at one request every five seconds</span></section>
