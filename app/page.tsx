@@ -72,6 +72,58 @@ export default function Home() {
     setNotice("50 mixed scenarios loaded: label, pickup, transit, customs, hold, delivery, exception, return and cancel.");
   }
 
+  async function downloadExcel() {
+    const completed = items.filter((item): item is BatchItem & { tracking: TrackingResult } => Boolean(item.tracking));
+    if (!completed.length) {
+      setNotice("Run a batch first, then download its completed results as an Excel workbook.");
+      return;
+    }
+
+    const XLSX = await import("xlsx");
+    const resultRows = completed.map(({ tracking }) => ({
+      "Tracking number": tracking.trackingNumber,
+      Status: tracking.status,
+      "Status code": tracking.statusCode,
+      "Status description": tracking.statusDetail,
+      "Last update": formatDateTime(tracking.statusTimestamp),
+      "Current location": tracking.currentLocation,
+      "Estimated arrival": formatDateTime(tracking.estimatedDelivery),
+      Service: tracking.service,
+      Product: tracking.productName,
+      Weight: tracking.weight,
+      Origin: tracking.origin,
+      Destination: tracking.destination,
+      References: tracking.references.map((reference) => `${reference.type}: ${reference.number}`).join(" | "),
+      Source: tracking.source,
+    }));
+    const eventRows = completed.flatMap(({ tracking }) => tracking.events.map((event) => ({
+      "Tracking number": tracking.trackingNumber,
+      Status: tracking.status,
+      "Event date": event.date,
+      "Event time": event.time,
+      Location: event.location,
+      "Event description": event.description,
+      "Current event": event.current ? "Yes" : "No",
+    })));
+    const summaryRows = [{
+      "Generated at": new Date().toLocaleString("en"),
+      "Completed results": completed.length,
+      Delivered: completed.filter(({ tracking }) => tracking.statusCode === "delivered").length,
+      Exceptions: completed.filter(({ tracking }) => tracking.statusCode === "failure").length,
+      "Data source": "Parcel Pulse / DHL Unified Tracking schema",
+    }];
+    const workbook = XLSX.utils.book_new();
+    const resultsSheet = XLSX.utils.json_to_sheet(resultRows);
+    resultsSheet["!cols"] = [18, 22, 15, 42, 24, 22, 21, 16, 32, 12, 20, 20, 45, 16].map((wch) => ({ wch }));
+    const eventsSheet = XLSX.utils.json_to_sheet(eventRows);
+    eventsSheet["!cols"] = [18, 22, 14, 12, 24, 52, 14].map((wch) => ({ wch }));
+    XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(summaryRows), "Batch summary");
+    XLSX.utils.book_append_sheet(workbook, resultsSheet, "Shipment results");
+    XLSX.utils.book_append_sheet(workbook, eventsSheet, "Event history");
+    XLSX.writeFile(workbook, `parcel-pulse-batch-${new Date().toISOString().slice(0, 10)}.xlsx`, { compression: true });
+    setNotice(`${completed.length} completed results exported to Excel.`);
+  }
+
   async function runBatch(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const trackingNumbers = parseTrackingNumbers(batchText);
@@ -118,7 +170,7 @@ export default function Home() {
 
       <section className="batch-layout" aria-live="polite">
         <article className="batch-card">
-          <div className="batch-card-head"><div><p className="section-label">BATCH RESULTS</p><h2>Full operational view</h2></div><span>{items.length ? `${completeCount} / ${items.length}` : "No batch yet"}</span></div>
+          <div className="batch-card-head"><div><p className="section-label">BATCH RESULTS</p><h2>Full operational view</h2></div><div className="batch-actions"><span>{items.length ? `${completeCount} / ${items.length}` : "No batch yet"}</span><button type="button" onClick={downloadExcel} disabled={!completeCount}>Download Excel</button></div></div>
           {items.length ? <div className="table-scroll"><div className="results-table" role="table" aria-label="Batch tracking results">
             <div className="result-row batch-result-row result-header" role="row"><span>Tracking number</span><span>Status / code</span><span>Estimated arrival</span><span>Last update</span><span>Current location</span><span>Service</span><span>Product</span><span>Weight</span><span>Source</span></div>
             {items.map((item) => <button className={`result-row batch-result-row ${statusTone(item.tracking)} state-${item.state}`} key={item.trackingNumber} type="button" onClick={() => item.tracking && setSelected(item.tracking)} disabled={!item.tracking}>
