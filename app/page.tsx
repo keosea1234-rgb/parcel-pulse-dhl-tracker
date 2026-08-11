@@ -128,7 +128,7 @@ export default function Home() {
     event.preventDefault();
     const trackingNumbers = parseTrackingNumbers(batchText);
     if (!trackingNumbers.length) return setNotice("Add at least one tracking number first.");
-    if (trackingNumbers.length > 100) return setNotice("Please limit each batch to 100 unique tracking numbers.");
+    if (trackingNumbers.length > 250) return setNotice("Please limit each batch to 250 unique tracking numbers.");
 
     const isScenarioBatch = trackingNumbers.every((trackingNumber) => trackingNumber.startsWith("PPDHLDEMO"));
     setItems(trackingNumbers.map((trackingNumber) => ({ trackingNumber, state: "queued" })));
@@ -160,7 +160,7 @@ export default function Home() {
         <nav className="topbar" aria-label="Main navigation"><a className="brand" href="#top"><span className="brand-mark">P</span><span className="brand-copy"><span>PARCEL PULSE</span><span className="brand-subtitle">DAILY SHIPMENT STATUS</span></span></a><span className="single-user">PRIVATE WORKSPACE</span></nav>
         <div className="hero-copy" id="top"><p className="eyebrow"><span className="pulse-dot" /> DHL UNIFIED TRACKING</p></div>
         <form className="batch-form" onSubmit={runBatch}>
-          <div className="form-head"><label htmlFor="tracking-numbers">Tracking numbers</label><div><button className="demo-fill" type="button" onClick={loadDemoCodes} disabled={isRunning}>Load 50 mixed demos</button><span>{parsedCount} / 100 unique codes</span></div></div>
+          <div className="form-head"><label htmlFor="tracking-numbers">Tracking numbers</label><div><button className="demo-fill" type="button" onClick={loadDemoCodes} disabled={isRunning}>Load 50 mixed demos</button><span>{parsedCount} / 250 unique codes</span></div></div>
           <textarea id="tracking-numbers" value={batchText} onChange={(event) => setBatchText(event.target.value)} placeholder="Paste one code per line, or separate codes with commas" disabled={isRunning} />
           <div className="form-actions"><p className="connection-note" role="status"><span>●</span>{notice}</p><button type="submit" disabled={isRunning}>{isRunning ? "Batch running…" : "Run mixed batch"}<span aria-hidden="true">→</span></button></div>
         </form>
@@ -186,7 +186,7 @@ export default function Home() {
         </aside>
       </section>
 
-      <section className="how-to" aria-labelledby="how-to-title"><div className="how-to-intro"><p className="section-label">WORKFLOW</p><h2 id="how-to-title">How to use</h2></div><ol className="how-to-steps"><li><span>01</span><div><h3>Paste tracking numbers</h3><p>Add up to 100 shipment codes.</p></div></li><li><span>02</span><div><h3>Click “Run batch”</h3><p>Review each returned shipment status.</p></div></li><li><span>03</span><div><h3>Download results as Excel</h3><p>Export the batch, details and event history.</p></div></li></ol></section>
+      <section className="how-to" aria-labelledby="how-to-title"><div className="how-to-intro"><p className="section-label">WORKFLOW</p><h2 id="how-to-title">How to use</h2></div><ol className="how-to-steps"><li><span>01</span><div><h3>Paste tracking numbers</h3><p>Add up to 250 shipment codes.</p></div></li><li><span>02</span><div><h3>Click “Run batch”</h3><p>Review each returned shipment status.</p></div></li><li><span>03</span><div><h3>Download results as Excel</h3><p>Export the batch, details and event history.</p></div></li></ol></section>
       <section className="integration-strip"><p><span className="pulse-dot" /> DHL-SCHEMA SCENARIOS</p><span>50 varied operational outcomes</span><span className="strip-divider" /><span>Real customer codes continue through the DHL API route</span></section>
     </main>
   );
