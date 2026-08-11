@@ -157,7 +157,7 @@ export default function Home() {
   return (
     <main className="app-shell">
       <section className="hero-panel">
-        <nav className="topbar" aria-label="Main navigation"><a className="brand" href="#top"><span className="brand-mark">P</span><span>PARCEL PULSE</span></a><span className="single-user">PRIVATE WORKSPACE</span></nav>
+        <nav className="topbar" aria-label="Main navigation"><a className="brand" href="#top"><span className="brand-mark">P</span><span className="brand-copy"><span>PARCEL PULSE</span><span className="brand-subtitle">DAILY SHIPMENT STATUS</span></span></a><span className="single-user">PRIVATE WORKSPACE</span></nav>
         <div className="hero-copy" id="top"><p className="eyebrow"><span className="pulse-dot" /> DHL UNIFIED TRACKING</p></div>
         <form className="batch-form" onSubmit={runBatch}>
           <div className="form-head"><label htmlFor="tracking-numbers">Tracking numbers</label><div><button className="demo-fill" type="button" onClick={loadDemoCodes} disabled={isRunning}>Load 50 mixed demos</button><span>{parsedCount} / 100 unique codes</span></div></div>
@@ -186,7 +186,7 @@ export default function Home() {
         </aside>
       </section>
 
-      <section className="status-guide" aria-labelledby="status-guide-title"><div className="guide-intro"><p className="section-label">DHL TRACKING REFERENCE</p><h2 id="status-guide-title">What the API can tell you</h2><p>Exact codes and event names vary by DHL service. A real API key keeps the original DHL status, description and optional fields.</p></div><div className="guide-panel"><h3>Common delivery states</h3><div className="status-groups"><span>Label created</span><span>Picked up</span><span>In transit</span><span>At customs</span><span>On hold</span><span>Out for delivery</span><span>Available for pickup</span><span>Delivered</span><span>Delivery exception</span><span>Refused / returned</span><span>Cancelled</span></div><p>Scenario codes are intentionally mixed so the table is not limited to one delivered response.</p></div><div className="guide-panel"><h3>Available shipment information</h3><ul className="api-data-list"><li>Current location and route history</li><li>ETA and delivery time window, when supplied</li><li>Status, detailed event description and timestamp</li><li>Origin, destination, provider and tracking ID</li><li>Piece events, weight and dimensions, when available</li><li>Proof of delivery for eligible Express and Freight shipments</li></ul></div></section>
+      <section className="how-to" aria-labelledby="how-to-title"><div className="how-to-intro"><p className="section-label">WORKFLOW</p><h2 id="how-to-title">How to use</h2></div><ol className="how-to-steps"><li><span>01</span><div><h3>Paste tracking numbers</h3><p>Add up to 100 shipment codes.</p></div></li><li><span>02</span><div><h3>Click “Run batch”</h3><p>Review each returned shipment status.</p></div></li><li><span>03</span><div><h3>Download results as Excel</h3><p>Export the batch, details and event history.</p></div></li></ol></section>
       <section className="integration-strip"><p><span className="pulse-dot" /> DHL-SCHEMA SCENARIOS</p><span>50 varied operational outcomes</span><span className="strip-divider" /><span>Real customer codes continue through the DHL API route</span></section>
     </main>
   );
