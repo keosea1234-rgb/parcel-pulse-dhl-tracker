@@ -34,7 +34,9 @@ const scenarios: Scenario[] = [
 ];
 
 function formatPlace(place?: { address?: Address } | Address) {
-  const address = place && "address" in place ? place.address : place;
+  const address: Address | undefined = place && "address" in place
+    ? (place as { address?: Address }).address
+    : (place as Address | undefined);
   if (!address) return "Not available";
   return [address.addressLocality, address.countryCode].filter(Boolean).join(", ") || "Not available";
 }
