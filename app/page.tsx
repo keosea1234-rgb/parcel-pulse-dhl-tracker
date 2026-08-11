@@ -158,7 +158,7 @@ export default function Home() {
     <main className="app-shell">
       <section className="hero-panel">
         <nav className="topbar" aria-label="Main navigation"><a className="brand" href="#top"><span className="brand-mark">P</span><span>PARCEL PULSE</span></a><span className="single-user">PRIVATE WORKSPACE</span></nav>
-        <div className="hero-copy" id="top"><p className="eyebrow"><span className="pulse-dot" /> DHL UNIFIED TRACKING</p><h1>See every response,<br /><em>not just delivered.</em></h1><p className="hero-description">Run a realistic mixed-scenario batch, then inspect the same operational fields a real DHL tracking response supplies.</p></div>
+        <div className="hero-copy" id="top"><p className="eyebrow"><span className="pulse-dot" /> DHL UNIFIED TRACKING</p></div>
         <form className="batch-form" onSubmit={runBatch}>
           <div className="form-head"><label htmlFor="tracking-numbers">Tracking numbers</label><div><button className="demo-fill" type="button" onClick={loadDemoCodes} disabled={isRunning}>Load 50 mixed demos</button><span>{parsedCount} / 100 unique codes</span></div></div>
           <textarea id="tracking-numbers" value={batchText} onChange={(event) => setBatchText(event.target.value)} placeholder="Paste one code per line, or separate codes with commas" disabled={isRunning} />
