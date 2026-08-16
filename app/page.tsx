@@ -47,6 +47,23 @@ function statusTone(tracking?: TrackingResult) {
   return "status-transit";
 }
 
+function shippingStatus(tracking: Pick<TrackingResult, "statusCode" | "statusDetail">) {
+  const description = tracking.statusDetail;
+  const normalizedDescription = description.toLocaleLowerCase();
+
+  if (normalizedDescription.includes("returned to shipper") || normalizedDescription.includes("returned to sender")) return "Returned to shipper";
+  if (normalizedDescription.includes("on hold")) return "On hold";
+  if (normalizedDescription.includes("delivery exception")) return "Delivery exception";
+  if (normalizedDescription.includes("cancel")) return "Cancelled";
+
+  switch (tracking.statusCode.toLocaleLowerCase()) {
+    case "pre-transit": return "Shipping label created";
+    case "transit": return "In transit";
+    case "delivered": return "Delivered";
+    default: return description;
+  }
+}
+
 export default function Home() {
   const [batchText, setBatchText] = useState("");
   const [items, setItems] = useState<BatchItem[]>([]);
@@ -74,9 +91,7 @@ export default function Home() {
     const XLSX = await import("xlsx");
     const resultRows = completed.map(({ tracking }) => ({
       "Tracking number": tracking.trackingNumber,
-      Status: tracking.status,
-      "Status code": tracking.statusCode,
-      "Status description": tracking.statusDetail,
+      "Shipping status": shippingStatus(tracking),
       "Last update": formatDateTime(tracking.statusTimestamp),
       "Current location": tracking.currentLocation,
       "Estimated arrival": formatDateTime(tracking.estimatedDelivery),
@@ -87,6 +102,9 @@ export default function Home() {
       Destination: tracking.destination,
       References: tracking.references.map((reference) => `${reference.type}: ${reference.number}`).join(" | "),
       Source: tracking.source,
+      "Raw DHL status": tracking.status,
+      "Raw DHL status code": tracking.statusCode,
+      "Raw DHL status description": tracking.statusDetail,
     }));
     const eventRows = completed.flatMap(({ tracking }) => tracking.events.map((event) => ({
       "Tracking number": tracking.trackingNumber,
@@ -106,7 +124,11 @@ export default function Home() {
     }];
     const workbook = XLSX.utils.book_new();
     const resultsSheet = XLSX.utils.json_to_sheet(resultRows);
-    resultsSheet["!cols"] = [18, 22, 15, 42, 24, 22, 21, 16, 32, 12, 20, 20, 45, 16].map((wch) => ({ wch }));
+    resultsSheet["!cols"] = [
+      { wch: 18 }, { wch: 24 }, { wch: 24 }, { wch: 22 }, { wch: 21 }, { wch: 16 },
+      { wch: 32 }, { wch: 12 }, { wch: 20 }, { wch: 20 }, { wch: 45 }, { wch: 16 },
+      { wch: 18, hidden: true }, { wch: 18, hidden: true }, { wch: 56, hidden: true },
+    ];
     const eventsSheet = XLSX.utils.json_to_sheet(eventRows);
     eventsSheet["!cols"] = [18, 22, 14, 12, 24, 52, 14].map((wch) => ({ wch }));
     XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(summaryRows), "Batch summary");
