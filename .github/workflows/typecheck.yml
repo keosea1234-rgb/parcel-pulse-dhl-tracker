@@ -11,6 +11,7 @@ permissions:
 
 jobs:
   typecheck:
+    name: TypeCheck
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
