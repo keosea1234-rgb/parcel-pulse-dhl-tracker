@@ -105,22 +105,28 @@ export default function Home() {
   const [authError, setAuthError] = useState<string | null>(null);
 
   useEffect(() => {
-    try {
+    const initializeAuthentication = async () => {
       const supabase = getSupabaseBrowserClient();
-      void supabase.auth.getSession().then(({ data, error }) => {
-        if (error) setAuthError(error.message);
-        setSession(data.session);
-        setIsAuthReady(true);
-      });
+      const { data, error } = await supabase.auth.getSession();
+      if (error) setAuthError(error.message);
+      setSession(data.session);
+      setIsAuthReady(true);
       const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, nextSession) => {
         setSession(nextSession);
         setIsAuthReady(true);
       });
       return () => subscription.unsubscribe();
-    } catch (error) {
+    };
+
+    let unsubscribe: (() => void) | undefined;
+    void initializeAuthentication().then((cleanup) => {
+      unsubscribe = cleanup;
+    }).catch((error) => {
       setAuthError(error instanceof Error ? error.message : "Authentication is not configured.");
       setIsAuthReady(true);
-    }
+    });
+
+    return () => unsubscribe?.();
   }, []);
 
   const completeCount = items.filter((item) => item.state === "complete").length;

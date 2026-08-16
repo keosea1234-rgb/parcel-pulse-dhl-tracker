@@ -7,7 +7,7 @@ export default function AuthCallback() {
   const [message, setMessage] = useState("Completing your sign-in…");
 
   useEffect(() => {
-    try {
+    const completeSignIn = async () => {
       const supabase = getSupabaseBrowserClient();
       const complete = async () => {
         const { data, error } = await supabase.auth.getSession();
@@ -19,9 +19,16 @@ export default function AuthCallback() {
         if (session) window.location.replace("/");
       });
       return () => subscription.unsubscribe();
-    } catch (error) {
+    };
+
+    let unsubscribe: (() => void) | undefined;
+    void completeSignIn().then((cleanup) => {
+      unsubscribe = cleanup;
+    }).catch((error) => {
       setMessage(error instanceof Error ? error.message : "Authentication could not be completed.");
-    }
+    });
+
+    return () => unsubscribe?.();
   }, []);
 
   return <main className="auth-shell"><p className="auth-loading">{message}</p></main>;
