@@ -5,8 +5,10 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 let client: SupabaseClient | undefined;
 
 function configuration() {
-  const environment = typeof process === "undefined" ? undefined : process.env;
-  return { url: environment?.NEXT_PUBLIC_SUPABASE_URL ?? "", publishableKey: environment?.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ?? "" };
+  return {
+    url: process.env.NEXT_PUBLIC_SUPABASE_URL ?? "",
+    publishableKey: process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ?? "",
+  };
 }
 
 export function getSupabaseBrowserClient() {
