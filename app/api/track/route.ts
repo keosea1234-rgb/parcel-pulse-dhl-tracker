@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { createClient } from "@supabase/supabase-js";
 
 const DHL_URL = "https://api-eu.dhl.com/track/shipments";
 
@@ -56,7 +57,21 @@ async function readDhlError(response: Response) {
   }
 }
 
+async function authenticateRequest(request: NextRequest) {
+  const accessToken = request.headers.get("authorization")?.replace(/^Bearer\s+/i, "");
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const publishableKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+  if (!supabaseUrl || !publishableKey) return { error: "Supabase authentication is not configured in this deployment.", status: 503 } as const;
+  if (!accessToken) return { error: "Authentication is required.", status: 401 } as const;
+  const supabase = createClient(supabaseUrl, publishableKey, { auth: { autoRefreshToken: false, persistSession: false } });
+  const { data, error } = await supabase.auth.getUser(accessToken);
+  if (error || !data.user) return { error: "Your session is invalid or has expired. Please sign in again.", status: 401 } as const;
+  return { userId: data.user.id } as const;
+}
+
 export async function GET(request: NextRequest) {
+  const authentication = await authenticateRequest(request);
+  if ("error" in authentication) return NextResponse.json({ error: authentication.error }, { status: authentication.status });
   const trackingNumber = request.nextUrl.searchParams.get("trackingNumber")?.trim();
   if (!trackingNumber) return NextResponse.json({ error: "A tracking number is required." }, { status: 400 });
 

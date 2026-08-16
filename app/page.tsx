@@ -1,6 +1,8 @@
 "use client";
 
-import { FormEvent, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
+import type { Session } from "@supabase/supabase-js";
+import { getSupabaseBrowserClient } from "./supabase-browser";
 
 type TrackingEvent = { date: string; time: string; location: string; description: string; current?: boolean };
 type TrackingResult = {
@@ -64,12 +66,62 @@ function shippingStatus(tracking: Pick<TrackingResult, "statusCode" | "statusDet
   }
 }
 
+function AuthenticationScreen({ configurationError }: { configurationError?: string | null }) {
+  const [mode, setMode] = useState<"sign-in" | "sign-up">("sign-in");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [message, setMessage] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  async function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setMessage(null);
+    setIsSubmitting(true);
+    try {
+      const supabase = getSupabaseBrowserClient();
+      const response = mode === "sign-in"
+        ? await supabase.auth.signInWithPassword({ email, password })
+        : await supabase.auth.signUp({ email, password, options: { emailRedirectTo: `${window.location.origin}/auth/callback` } });
+      if (response.error) throw response.error;
+      if (mode === "sign-up" && !response.data.session) setMessage("Check your inbox to confirm your email, then return here to sign in.");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Authentication could not be completed.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  return <main className="auth-shell"><section className="auth-card" aria-labelledby="auth-title"><span className="brand-mark">P</span><p className="section-label">PARCEL PULSE</p><h1 id="auth-title">{mode === "sign-in" ? "Welcome back" : "Create your workspace"}</h1><p>Sign in to access DHL tracking and exports.</p>{configurationError ? <p className="auth-message is-error">{configurationError}</p> : <form onSubmit={submit}><label>Email<input type="email" autoComplete="email" value={email} onChange={(event) => setEmail(event.target.value)} required /></label><label>Password<input type="password" autoComplete={mode === "sign-in" ? "current-password" : "new-password"} minLength={6} value={password} onChange={(event) => setPassword(event.target.value)} required /></label>{message && <p className="auth-message">{message}</p>}<button type="submit" disabled={isSubmitting}>{isSubmitting ? "Please wait…" : mode === "sign-in" ? "Sign in" : "Create account"}</button></form>}<button className="auth-switch" type="button" onClick={() => { setMode((current) => current === "sign-in" ? "sign-up" : "sign-in"); setMessage(null); }}>{mode === "sign-in" ? "Need an account? Create one" : "Already have an account? Sign in"}</button></section></main>;
+}
+
 export default function Home() {
   const [batchText, setBatchText] = useState("");
   const [items, setItems] = useState<BatchItem[]>([]);
   const [selected, setSelected] = useState<TrackingResult | null>(null);
   const [isRunning, setIsRunning] = useState(false);
   const [notice, setNotice] = useState("Paste live DHL tracking numbers to query their current status.");
+  const [session, setSession] = useState<Session | null>(null);
+  const [isAuthReady, setIsAuthReady] = useState(false);
+  const [authError, setAuthError] = useState<string | null>(null);
+
+  useEffect(() => {
+    try {
+      const supabase = getSupabaseBrowserClient();
+      void supabase.auth.getSession().then(({ data, error }) => {
+        if (error) setAuthError(error.message);
+        setSession(data.session);
+        setIsAuthReady(true);
+      });
+      const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+        setSession(nextSession);
+        setIsAuthReady(true);
+      });
+      return () => subscription.unsubscribe();
+    } catch (error) {
+      setAuthError(error instanceof Error ? error.message : "Authentication is not configured.");
+      setIsAuthReady(true);
+    }
+  }, []);
 
   const completeCount = items.filter((item) => item.state === "complete").length;
   const checkingCount = items.filter((item) => item.state === "checking").length;
@@ -153,7 +205,7 @@ export default function Home() {
       updateItem(index, { state: "checking" });
       setNotice(`Checking DHL response ${index + 1} of ${trackingNumbers.length}.`);
       try {
-        const response = await fetch(`/api/track?trackingNumber=${encodeURIComponent(trackingNumber)}`);
+        const response = await fetch(`/api/track?trackingNumber=${encodeURIComponent(trackingNumber)}`, { headers: { Authorization: `Bearer ${session?.access_token ?? ""}` } });
         const data = await response.json();
         if (!response.ok) throw new Error(data.error ?? "Tracking request failed");
         updateItem(index, { state: "complete", tracking: data.tracking });
@@ -169,10 +221,17 @@ export default function Home() {
     setNotice(failedCount ? `Batch complete: ${trackingNumbers.length - failedCount} live results, ${failedCount} request${failedCount === 1 ? "" : "s"} failed. See the table for DHL errors.` : `Batch complete: ${trackingNumbers.length} live DHL tracking numbers processed.`);
   }
 
+  if (!isAuthReady) return <main className="auth-shell"><p className="auth-loading">Checking your secure session…</p></main>;
+  if (!session) return <AuthenticationScreen configurationError={authError} />;
+
+  async function signOut() {
+    await getSupabaseBrowserClient().auth.signOut();
+  }
+
   return (
     <main className="app-shell">
       <section className="hero-panel">
-        <nav className="topbar" aria-label="Main navigation"><a className="brand" href="#top"><span className="brand-mark">P</span><span className="brand-copy"><span>PARCEL PULSE</span><span className="brand-subtitle">DAILY SHIPMENT STATUS</span></span></a><span className="single-user">PRIVATE WORKSPACE</span></nav>
+        <nav className="topbar" aria-label="Main navigation"><a className="brand" href="#top"><span className="brand-mark">P</span><span className="brand-copy"><span>PARCEL PULSE</span><span className="brand-subtitle">DAILY SHIPMENT STATUS</span></span></a><button className="single-user account-button" type="button" onClick={signOut}>{session.user.email ?? "PRIVATE WORKSPACE"} · Sign out</button></nav>
         <div className="hero-copy" id="top"><p className="eyebrow"><span className="pulse-dot" /> DHL UNIFIED TRACKING</p></div>
         <form className="batch-form" onSubmit={runBatch}>
           <div className="form-head"><label htmlFor="tracking-numbers">Live DHL tracking numbers</label><span>{parsedCount} / 250 unique codes</span></div>
