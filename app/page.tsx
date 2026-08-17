@@ -59,15 +59,17 @@ function shippingStatus(tracking: Pick<TrackingResult, "statusCode" | "statusDet
   const description = tracking.statusDetail;
   const normalizedDescription = description.toLocaleLowerCase();
   const normalizedStatusCode = tracking.statusCode.toLocaleLowerCase();
+  const hasClearanceEvent = tracking.events.some((event) => event.description.toLocaleLowerCase().includes("clearance"));
 
   if (normalizedDescription.includes("returned to shipper") || normalizedDescription.includes("returned to sender")) return "Returned to shipper";
   if (normalizedStatusCode === "failure" && normalizedDescription.includes("on hold")) {
-    return tracking.events.some((event) => event.description.toLocaleLowerCase().includes("clearance"))
+    return hasClearanceEvent
       ? "On hold - Customs clearance"
       : "On hold";
   }
   if (normalizedDescription.includes("delivery exception")) return "Delivery exception";
   if (normalizedDescription.includes("cancel")) return "Cancelled";
+  if (normalizedStatusCode === "transit" && (normalizedDescription.includes("clearance") || hasClearanceEvent)) return "Customs clearance";
 
   switch (normalizedStatusCode) {
     case "pre-transit": return "Shipping label created";
