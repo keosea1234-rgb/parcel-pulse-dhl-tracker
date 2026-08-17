@@ -165,11 +165,11 @@ export default function Home() {
       return {
         "Tracking number": tracking.trackingNumber,
         "Shipping status": shippingStatusLabel,
-        "Last update": formatDate(tracking.statusTimestamp),
-        "Current location": tracking.currentLocation,
         "Estimated arrival": shippingStatusLabel === "Delivered"
           ? formatDate(tracking.statusTimestamp)
           : formatDate(tracking.estimatedDelivery),
+        "Last update": formatDate(tracking.statusTimestamp),
+        "Current location": tracking.currentLocation,
         Service: tracking.service,
         Product: tracking.productName,
         Weight: tracking.weight,
@@ -201,7 +201,7 @@ export default function Home() {
     const workbook = XLSX.utils.book_new();
     const resultsSheet = XLSX.utils.json_to_sheet(resultRows);
     resultsSheet["!cols"] = [
-      { wch: 18 }, { wch: 24 }, { wch: 24 }, { wch: 22 }, { wch: 21 }, { wch: 16 },
+      { wch: 18 }, { wch: 24 }, { wch: 21 }, { wch: 24 }, { wch: 22 }, { wch: 16 },
       { wch: 32 }, { wch: 12 }, { wch: 20 }, { wch: 20 }, { wch: 45 }, { wch: 16 },
       { wch: 18, hidden: true }, { wch: 18, hidden: true }, { wch: 56, hidden: true },
     ];
