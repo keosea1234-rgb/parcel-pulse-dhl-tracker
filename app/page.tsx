@@ -41,6 +41,12 @@ function formatDateTime(value?: string) {
   return Number.isNaN(date.valueOf()) ? value : new Intl.DateTimeFormat("en", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }).format(date);
 }
 
+function formatDate(value?: string) {
+  if (!value || value === "Not available") return "Not supplied";
+  const date = new Date(value);
+  return Number.isNaN(date.valueOf()) ? value : new Intl.DateTimeFormat("en", { month: "short", day: "numeric" }).format(date);
+}
+
 function statusTone(tracking?: TrackingResult) {
   if (!tracking) return "";
   if (tracking.statusCode === "failure") return "status-failure";
@@ -49,16 +55,21 @@ function statusTone(tracking?: TrackingResult) {
   return "status-transit";
 }
 
-function shippingStatus(tracking: Pick<TrackingResult, "statusCode" | "statusDetail">) {
+function shippingStatus(tracking: Pick<TrackingResult, "statusCode" | "statusDetail" | "events">) {
   const description = tracking.statusDetail;
   const normalizedDescription = description.toLocaleLowerCase();
+  const normalizedStatusCode = tracking.statusCode.toLocaleLowerCase();
 
   if (normalizedDescription.includes("returned to shipper") || normalizedDescription.includes("returned to sender")) return "Returned to shipper";
-  if (normalizedDescription.includes("on hold")) return "On hold";
+  if (normalizedStatusCode === "failure" && normalizedDescription.includes("on hold")) {
+    return tracking.events.some((event) => event.description.toLocaleLowerCase().includes("clearance"))
+      ? "On hold - Customs clearance"
+      : "On hold";
+  }
   if (normalizedDescription.includes("delivery exception")) return "Delivery exception";
   if (normalizedDescription.includes("cancel")) return "Cancelled";
 
-  switch (tracking.statusCode.toLocaleLowerCase()) {
+  switch (normalizedStatusCode) {
     case "pre-transit": return "Shipping label created";
     case "transit": return "In transit";
     case "delivered": return "Delivered";
@@ -147,23 +158,28 @@ export default function Home() {
     }
 
     const XLSX = await import("xlsx");
-    const resultRows = completed.map(({ tracking }) => ({
-      "Tracking number": tracking.trackingNumber,
-      "Shipping status": shippingStatus(tracking),
-      "Last update": formatDateTime(tracking.statusTimestamp),
-      "Current location": tracking.currentLocation,
-      "Estimated arrival": formatDateTime(tracking.estimatedDelivery),
-      Service: tracking.service,
-      Product: tracking.productName,
-      Weight: tracking.weight,
-      Origin: tracking.origin,
-      Destination: tracking.destination,
-      References: tracking.references.map((reference) => `${reference.type}: ${reference.number}`).join(" | "),
-      Source: tracking.source,
-      "Raw DHL status": tracking.status,
-      "Raw DHL status code": tracking.statusCode,
-      "Raw DHL status description": tracking.statusDetail,
-    }));
+    const resultRows = completed.map(({ tracking }) => {
+      const shippingStatusLabel = shippingStatus(tracking);
+      return {
+        "Tracking number": tracking.trackingNumber,
+        "Shipping status": shippingStatusLabel,
+        "Last update": formatDate(tracking.statusTimestamp),
+        "Current location": tracking.currentLocation,
+        "Estimated arrival": shippingStatusLabel === "Delivered"
+          ? formatDate(tracking.statusTimestamp)
+          : formatDate(tracking.estimatedDelivery),
+        Service: tracking.service,
+        Product: tracking.productName,
+        Weight: tracking.weight,
+        Origin: tracking.origin,
+        Destination: tracking.destination,
+        References: tracking.references.map((reference) => `${reference.type}: ${reference.number}`).join(" | "),
+        Source: tracking.source,
+        "Raw DHL status": tracking.status,
+        "Raw DHL status code": tracking.statusCode,
+        "Raw DHL status description": tracking.statusDetail,
+      };
+    });
     const eventRows = completed.flatMap(({ tracking }) => tracking.events.map((event) => ({
       "Tracking number": tracking.trackingNumber,
       Status: tracking.status,
