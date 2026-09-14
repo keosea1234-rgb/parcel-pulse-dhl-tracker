@@ -1,6 +1,7 @@
 "use client";
 
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
+import * as XLSX from "xlsx";
 import type { Session } from "@supabase/supabase-js";
 import { getSupabaseBrowserClient } from "./supabase-browser";
 
@@ -116,6 +117,12 @@ export default function Home() {
   const [session, setSession] = useState<Session | null>(null);
   const [isAuthReady, setIsAuthReady] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
+  const [exportFile, setExportFile] = useState<{ url: string; name: string } | null>(null);
+  const detailRef = useRef<HTMLElement>(null);
+
+  useEffect(() => {
+    return () => { if (exportFile) URL.revokeObjectURL(exportFile.url); };
+  }, [exportFile]);
 
   useEffect(() => {
     const initializeAuthentication = async () => {
@@ -152,14 +159,14 @@ export default function Home() {
     setItems((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, ...update } : item));
   }
 
-  async function downloadExcel() {
+  function downloadExcel() {
     const completed = items.filter((item): item is BatchItem & { tracking: TrackingResult } => Boolean(item.tracking));
     if (!completed.length) {
       setNotice("Run a batch first, then download its completed results as an Excel workbook.");
       return;
     }
 
-    const XLSX = await import("xlsx");
+    try {
     const resultRows = completed.map(({ tracking }) => {
       const shippingStatusLabel = shippingStatus(tracking);
       return {
@@ -210,8 +217,22 @@ export default function Home() {
     XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(summaryRows), "Batch summary");
     XLSX.utils.book_append_sheet(workbook, resultsSheet, "Shipment results");
     XLSX.utils.book_append_sheet(workbook, eventsSheet, "Event history");
-    XLSX.writeFile(workbook, `parcel-pulse-batch-${new Date().toISOString().slice(0, 10)}.xlsx`, { compression: true });
-    setNotice(`${completed.length} completed results exported to Excel.`);
+    // Keep file creation and the download in the original Safari tap event.
+    // Retain the URL so the visible link also supports opening/saving it again.
+    const name = `parcel-pulse-batch-${new Date().toISOString().slice(0, 10)}.xlsx`;
+    const bytes = XLSX.write(workbook, { bookType: "xlsx", type: "array", compression: true });
+    const url = URL.createObjectURL(new Blob([bytes], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }));
+    setExportFile({ url, name });
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = name;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    setNotice(`Excel ready with ${completed.length} results. If the download did not start, tap “Save Excel file”.`);
+    } catch {
+      setNotice("The Excel file could not be created. Please try Download Excel again.");
+    }
   }
 
   async function runBatch(event: FormEvent<HTMLFormElement>) {
@@ -220,6 +241,7 @@ export default function Home() {
     if (!trackingNumbers.length) return setNotice("Add at least one tracking number first.");
     if (trackingNumbers.length > 250) return setNotice("Please limit each batch to 250 unique tracking numbers.");
 
+    setExportFile(null);
     setItems(trackingNumbers.map((trackingNumber) => ({ trackingNumber, state: "queued" })));
     setSelected(null);
     setIsRunning(true);
@@ -259,7 +281,7 @@ export default function Home() {
         <div className="hero-copy" id="top"><p className="eyebrow"><span className="pulse-dot" /> DHL UNIFIED TRACKING</p></div>
         <form className="batch-form" onSubmit={runBatch}>
           <div className="form-head"><label htmlFor="tracking-numbers">Live DHL tracking numbers</label><span>{parsedCount} / 250 unique codes</span></div>
-          <textarea id="tracking-numbers" value={batchText} onChange={(event) => setBatchText(event.target.value)} placeholder="Paste one live tracking number per line, or separate numbers with commas" disabled={isRunning} />
+          <textarea id="tracking-numbers" value={batchText} onChange={(event) => setBatchText(event.target.value)} placeholder="Paste one live tracking number per line, or separate numbers with commas" autoCapitalize="none" autoCorrect="off" spellCheck={false} disabled={isRunning} />
           <div className="form-actions"><p className="connection-note" role="status"><span>●</span>{notice}</p><button type="submit" disabled={isRunning}>{isRunning ? "Batch running…" : "Run batch"}<span aria-hidden="true">→</span></button></div>
         </form>
       </section>
@@ -268,8 +290,13 @@ export default function Home() {
 
       <section className="batch-layout" aria-live="polite">
         <article className="batch-card">
-          <div className="batch-card-head"><div><p className="section-label">BATCH RESULTS</p><h2>Full operational view</h2></div><div className="batch-actions"><span>{items.length ? `${completeCount} / ${items.length}` : "No batch yet"}</span><button type="button" onClick={downloadExcel} disabled={!completeCount}>Download Excel</button></div></div>
-          {items.length ? <div className="table-scroll"><div className="results-table" role="table" aria-label="Batch tracking results">
+          <div className="batch-card-head"><div><p className="section-label">BATCH RESULTS</p><h2>Full operational view</h2></div><div className="batch-actions"><span>{items.length ? `${completeCount} / ${items.length} ready to export` : "Run a batch to enable export"}</span><button type="button" onClick={downloadExcel} disabled={!completeCount}>Download Excel</button>{exportFile && <a className="excel-download" href={exportFile.url} download={exportFile.name}>Save Excel file</a>}</div></div>
+          {items.length > 0 && <div className="mobile-results" aria-label="Shipment summaries">{items.map((item) => <article className={`shipment-card ${selected?.trackingNumber === item.trackingNumber ? "is-selected" : ""}`} key={item.trackingNumber}>
+            <div className="shipment-card-head"><strong>{item.trackingNumber}</strong><span className="shipment-status">{item.tracking ? shippingStatus(item.tracking) : queueStateLabel(item.state)}</span></div>
+            {item.tracking ? <><dl><div><dt>{item.tracking.statusCode === "delivered" ? "Delivered on" : "Estimated arrival"}</dt><dd>{formatDateTime(item.tracking.statusCode === "delivered" ? item.tracking.statusTimestamp : item.tracking.estimatedDelivery)}</dd></div><div><dt>Current location</dt><dd>{item.tracking.currentLocation}</dd></div><div><dt>Last update</dt><dd>{formatDateTime(item.tracking.statusTimestamp)}</dd></div></dl><button type="button" aria-label={`View shipment ${item.trackingNumber} details`} onClick={() => { setSelected(item.tracking!); detailRef.current?.focus({ preventScroll: true }); detailRef.current?.scrollIntoView({ block: "start" }); }}>View shipment details</button></> : item.error ? <p className="shipment-error">{item.error}</p> : <p className="table-hint">{item.state === "checking" ? "Retrieving the latest DHL status…" : "Waiting for this shipment to be checked."}</p>}
+          </article>)}</div>}
+          {items.length > 0 && <p className="table-hint" id="table-scroll-hint">Swipe the table sideways for all columns. Select a result to view shipment details.</p>}
+          {items.length ? <div className="table-scroll" tabIndex={0} role="region" aria-label="Scrollable shipment table" aria-describedby="table-scroll-hint"><div className="results-table" role="table" aria-label="Batch tracking results">
             <div className="result-row batch-result-row result-header" role="row"><span>Tracking number</span><span>Status / code</span><span>Estimated arrival</span><span>Last update</span><span>Current location</span><span>Service</span><span>Product</span><span>Weight</span><span>Source</span></div>
             {items.map((item) => <button className={`result-row batch-result-row ${statusTone(item.tracking)} state-${item.state}`} key={item.trackingNumber} type="button" onClick={() => item.tracking && setSelected(item.tracking)} disabled={!item.tracking}>
               <span className="code-cell">{item.trackingNumber}</span><span className="status-cell" title={item.error}><i className="result-dot" />{item.tracking ? <><b>{item.tracking.status}</b><small>{item.tracking.statusCode}</small></> : <b>{item.error ?? queueStateLabel(item.state)}</b>}</span><span>{item.tracking ? formatDateTime(item.tracking.estimatedDelivery) : "—"}</span><span>{item.tracking ? formatDateTime(item.tracking.statusTimestamp) : "—"}</span><span>{item.tracking?.currentLocation ?? "—"}</span><span>{item.tracking?.service ?? "—"}</span><span>{item.tracking?.productName ?? "—"}</span><span>{item.tracking?.weight ?? "—"}</span><span className="source-cell">{item.tracking?.source ?? (item.state === "failed" ? "DHL error" : "Queued")}</span>
@@ -278,7 +305,7 @@ export default function Home() {
           <footer className="data-note"><span>●</span> Results are returned directly by DHL Unified Tracking. Failed queries show the DHL error instead of a substitute result.</footer>
         </article>
 
-        <aside className="detail-card">
+        <aside className="detail-card" ref={detailRef} tabIndex={-1} aria-label="Shipment details">
           <div className="detail-head"><div><p className="section-label">RESPONSE INSPECTOR</p><h2>{selected?.status ?? "Awaiting batch"}</h2></div>{selected && <span className={`status-badge ${statusTone(selected)}`}><span /> {selected.statusCode}</span>}</div>
           {selected ? <><p className="detail-copy">{selected.statusDetail}</p><div className="detail-meta"><span>TRACKING NUMBER<strong>{selected.trackingNumber}</strong></span><span>STATUS CODE<strong>{selected.statusCode}</strong></span><span>LAST UPDATE<strong>{formatDateTime(selected.statusTimestamp)}</strong></span><span>CURRENT LOCATION<strong>{selected.currentLocation}</strong></span><span>ESTIMATED DELIVERY<strong>{formatDateTime(selected.estimatedDelivery)}</strong></span><span>SERVICE<strong>{selected.service}</strong></span><span>PRODUCT<strong>{selected.productName}</strong></span><span>WEIGHT<strong>{selected.weight}</strong></span></div><div className="route-data"><span>ORIGIN<strong>{selected.origin}</strong></span><i aria-hidden="true">→</i><span>DESTINATION<strong>{selected.destination}</strong></span></div>{selected.references.length > 0 && <div className="reference-list"><span>REFERENCES</span>{selected.references.map((reference) => <small key={`${reference.type}-${reference.number}`}>{reference.type}: <b>{reference.number}</b></small>)}</div>}<ol className="mini-timeline">{selected.events.map((shipmentEvent, index) => <li key={`${shipmentEvent.date}-${index}`} className={shipmentEvent.current ? "is-current" : ""}><i /><div><strong>{shipmentEvent.description}</strong><span>{shipmentEvent.date} · {shipmentEvent.time} · {shipmentEvent.location}</span></div></li>)}</ol></> : <div className="awaiting-detail"><span className="pulse-dot" /><p>Run a live batch, then select a successful row to inspect its DHL status code, timestamps, location, product, weight, references and event history.</p></div>}
         </aside>
