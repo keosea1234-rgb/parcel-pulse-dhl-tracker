@@ -255,7 +255,7 @@ export default function Home() {
   return (
     <main className="app-shell">
       <section className="hero-panel">
-        <nav className="topbar" aria-label="Main navigation"><a className="brand" href="#top"><span className="brand-mark">P</span><span className="brand-copy"><span>PARCEL PULSE</span><span className="brand-subtitle">DAILY SHIPMENT STATUS</span></span></a><button className="single-user account-button" type="button" onClick={signOut}>{session.user.email ?? "PRIVATE WORKSPACE"} · Sign out</button></nav>
+        <nav className="topbar" aria-label="Main navigation"><a className="brand" href="#top"><span className="brand-mark">P</span><span className="brand-copy"><span>PARCEL PULSE</span><span className="brand-subtitle">DAILY SHIPMENT STATUS</span></span></a><button className="single-user account-button" type="button" onClick={signOut}><span className="account-email">{session.user.email ?? "PRIVATE WORKSPACE"}</span><span className="account-divider"> · </span><span>Sign out</span></button></nav>
         <div className="hero-copy" id="top"><p className="eyebrow"><span className="pulse-dot" /> DHL UNIFIED TRACKING</p></div>
         <form className="batch-form" onSubmit={runBatch}>
           <div className="form-head"><label htmlFor="tracking-numbers">Live DHL tracking numbers</label><span>{parsedCount} / 250 unique codes</span></div>
